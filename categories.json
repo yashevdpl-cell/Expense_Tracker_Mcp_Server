@@ -1,0 +1,114 @@
+{
+  "expense_categories": {
+    "Food & Dining": {
+      "description": "All everyday food, dining out, groceries, snacks, and beverage expenses",
+      "subcategories": {
+        "Groceries": "Daily household food essentials, fruits, vegetables, dairy, pulses, spices, supermarket runs",
+        "Restaurants & Dining Out": "Sit-down dinners, family restaurant bills, buffets, weekend outings",
+        "Food Delivery": "Online food apps like Swiggy, Zomato, UberEats, pizza delivery",
+        "Coffee & Snacks": "Tea, coffee shops, cafe visits, street food, evening snacks"
+      }
+    },
+    "Housing & Utilities": {
+      "description": "Fixed and recurring home living expenses, bills, and upkeep",
+      "subcategories": {
+        "Rent": "Monthly house or apartment rent payments",
+        "Electricity": "Monthly power/electric board utility bills",
+        "Water & Gas": "Water supply, LPG gas cylinders, piped natural gas bills",
+        "Internet & Mobile": "Broadband WiFi bills, mobile recharge, phone connections",
+        "Home Maintenance & Repairs": "Plumber, electrician, home repairs, society maintenance charges"
+      }
+    },
+    "Transportation & Commute": {
+      "description": "All daily travel, transit, fuel, vehicle upkeep and commuting costs",
+      "subcategories": {
+        "Fuel & Petrol": "Petrol, diesel, CNG refills for car, bike, or scooter",
+        "Cabs & Taxis": "Uber, Ola, Rapido, auto-rickshaws, meter taxis",
+        "Public Transit": "Metro tickets/cards, local train, public bus fares",
+        "Vehicle Service & Maintenance": "Periodic car/bike servicing, tire puncture, car wash, oil change",
+        "Parking & Tolls": "Parking fees at malls/offices, highway toll plazas, FASTag recharges"
+      }
+    },
+    "Shopping & Personal Care": {
+      "description": "Personal goods, apparel, self-care, and lifestyle purchases",
+      "subcategories": {
+        "Clothing & Footwear": "Shirts, pants, shoes, seasonal clothes, activewear",
+        "Electronics & Gadgets": "Mobile phones, laptops, chargers, headphones, computer accessories",
+        "Personal Care & Grooming": "Salon, haircut, skincare, cosmetics, toiletries, perfumes",
+        "Home & Kitchen Appliances": "Cookware, bedsheets, decor, utensils, small appliances"
+      }
+    },
+    "Entertainment & Leisure": {
+      "description": "Fun, hobbies, relaxation, digital media, and social events",
+      "subcategories": {
+        "Streaming Subscriptions": "Netflix, Amazon Prime, Spotify, YouTube Premium, Disney+ Hotstar",
+        "Movies & Events": "Cinema movie tickets, concerts, live shows, theater tickets",
+        "Gaming & Hobbies": "Video games, in-game purchases, hobby equipment, books for leisure",
+        "Vacations & Weekend Trips": "Hotel stays, resort bookings, tour packages, travel tickets"
+      }
+    },
+    "Health, Fitness & Medical": {
+      "description": "Healthcare, doctor consultations, wellness, and fitness routines",
+      "subcategories": {
+        "Doctor & Diagnostics": "Clinic consultation fees, blood tests, dental checkups, eye exams",
+        "Medicines & Pharmacy": "Prescription medicines, supplements, first aid supplies",
+        "Fitness & Gym": "Gym memberships, yoga classes, sports club subscriptions",
+        "Health Insurance": "Annual health insurance premiums, mediclaim policies"
+      }
+    },
+    "Financial & Professional": {
+      "description": "Banking charges, debts, official fees, insurance, and professional services",
+      "subcategories": {
+        "Loan EMI": "Home loan, car loan, personal loan, or education loan installments",
+        "Credit Card Bill": "Credit card monthly payments and interest charges",
+        "Taxes & Government Fees": "Income tax, property tax, municipal fees, passport/license charges",
+        "Bank Fees & Penalties": "ATM fees, account maintenance charges, card renewal charges"
+      }
+    },
+    "Education & Career Growth": {
+      "description": "Skill learning, educational materials, certifications, and classes",
+      "subcategories": {
+        "Online Courses & Certifications": "Coursera, Udemy, technical certificates, bootcamps",
+        "Books & Study Material": "Textbooks, reference guides, educational eBooks",
+        "Tuition & College Fees": "School, college, coaching, or university semester fees"
+      }
+    }
+  },
+  "income_categories": {
+    "Employment": {
+      "description": "Regular earnings from primary job or company employment",
+      "subcategories": {
+        "Monthly Salary": "Regular monthly salary paycheck received from employer",
+        "Bonus & Incentives": "Performance bonuses, festival bonus, annual appraisal payouts",
+        "Overtime": "Extra pay for working additional hours",
+        "Reimbursements": "Office travel, food, or equipment expense reimbursements"
+      }
+    },
+    "Freelance & Side Business": {
+      "description": "Independent client work, consulting, and business revenue",
+      "subcategories": {
+        "Client Projects": "Freelance software development, design, writing, or marketing gigs",
+        "Consulting Fees": "Advisory, hourly consulting, or mentoring services",
+        "E-Commerce & Digital Sales": "Online product sales, digital templates, software licenses"
+      }
+    },
+    "Investments & Passive Income": {
+      "description": "Returns generated from investments, real estate, and capital",
+      "subcategories": {
+        "Stock Dividends": "Payouts from shares, equity funds, or ETFs",
+        "Bank Interest & FDs": "Savings account interest, fixed deposit or recurring deposit maturity returns",
+        "Mutual Fund Gains": "Realized profits or capital gains from redeeming mutual funds",
+        "Rental Income": "Rent collected from tenants for residential or commercial property"
+      }
+    },
+    "Other Inflows": {
+      "description": "Gifts, one-off refunds, cashbacks, and miscellaneous money received",
+      "subcategories": {
+        "Gifts & Monetary Presents": "Birthday, festive, or family financial gifts",
+        "Cashback & Rewards": "Credit card cashback, UPI rewards, store credits",
+        "Refunds & Returns": "Refunds from cancelled orders, flight cancellations, product returns",
+        "Sale of Used Goods": "Selling old phone, bike, furniture, or unused gadgets"
+      }
+    }
+  }
+}
