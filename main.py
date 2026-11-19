@@ -1,4 +1,4 @@
-import sqlite3
+import aiosqlite
 import json
 import os
 import tempfile
@@ -44,22 +44,21 @@ def get_db_path() -> Path:
 
 DB_PATH = get_db_path()
 
-def get_connection():
-    """Helper function to connect to SQLite database."""
-    conn = sqlite3.connect(DB_PATH)
-    # Enable row_factory to access columns by column name
-    conn.row_factory = sqlite3.Row
-    return conn
+_db_initialized = False
 
-def init_db():
+async def ensure_db():
     """
-    Create the transactions table if it does not already exist,
+    Asynchronously create the transactions table if it does not already exist,
     and ensure the subcategory and description columns are present.
+    Runs once safely without blocking server startup.
     """
-    with get_connection() as conn:
-        cursor = conn.cursor()
+    global _db_initialized
+    if _db_initialized:
+        return
+
+    async with aiosqlite.connect(DB_PATH) as conn:
         # Create table with all required columns
-        cursor.execute("""
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS transactions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 date TEXT NOT NULL,
@@ -70,17 +69,17 @@ def init_db():
                 description TEXT DEFAULT ''    -- full description/notes
             )
         """)
-        
+
         # Ensure subcategory column exists if table existed previously
-        cursor.execute("PRAGMA table_info(transactions)")
-        columns = [row["name"] for row in cursor.fetchall()]
-        if "subcategory" not in columns:
-            cursor.execute("ALTER TABLE transactions ADD COLUMN subcategory TEXT DEFAULT ''")
+        async with conn.execute("PRAGMA table_info(transactions)") as cursor:
+            rows = await cursor.fetchall()
+            columns = [row[1] for row in rows]
+            if "subcategory" not in columns:
+                await conn.execute("ALTER TABLE transactions ADD COLUMN subcategory TEXT DEFAULT ''")
 
-        conn.commit()
+        await conn.commit()
 
-# Initialize the database when the server starts
-init_db()
+    _db_initialized = True
 
 
 # ----------------------------------------------------
@@ -88,7 +87,7 @@ init_db()
 # ----------------------------------------------------
 # MCP Resources allow Claude to read context data directly.
 @mcp.resource("categories://all")
-def get_categories_resource() -> str:
+async def get_categories_resource() -> str:
     """
     Returns the comprehensive JSON guide containing all expense and income
     categories, subcategories, and their detailed descriptions.
@@ -102,7 +101,7 @@ def get_categories_resource() -> str:
 # 4. Tool: List Available Categories & Subcategories
 # ----------------------------------------------------
 @mcp.tool
-def list_categories(category_type: str = "all") -> str:
+async def list_categories(category_type: str = "all") -> str:
     """
     View all available categories and their subcategories with descriptions.
     
@@ -137,10 +136,10 @@ def list_categories(category_type: str = "all") -> str:
 
 
 # ----------------------------------------------------
-# 5. Tool: Add Expense
+# 5. Tool: Add Expense (Asynchronous)
 # ----------------------------------------------------
 @mcp.tool
-def add_expense(
+async def add_expense(
     amount: float,
     category: str,
     subcategory: str = "",
@@ -148,7 +147,7 @@ def add_expense(
     date: str = ""
 ) -> str:
     """
-    Record a new expense with a category, subcategory, and detailed description.
+    Record a new expense asynchronously with a category, subcategory, and detailed description.
     
     Parameters:
     - amount: Money spent (e.g. 250.00)
@@ -157,16 +156,17 @@ def add_expense(
     - description: Clear details about the expense (e.g. 'Bought 2kg apples & milk from supermarket')
     - date: Optional date YYYY-MM-DD (defaults to today's date if empty)
     """
+    await ensure_db()
     if not date:
         date = datetime.now().strftime("%Y-%m-%d")
 
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("""
             INSERT INTO transactions (date, type, category, subcategory, amount, description)
             VALUES (?, 'expense', ?, ?, ?, ?)
         """, (date, category, subcategory, amount, description))
-        conn.commit()
+        await conn.commit()
         new_id = cursor.lastrowid
 
     sub_info = f" > {subcategory}" if subcategory else ""
@@ -175,10 +175,10 @@ def add_expense(
 
 
 # ----------------------------------------------------
-# 6. Tool: Add Income / Credit
+# 6. Tool: Add Income / Credit (Asynchronous)
 # ----------------------------------------------------
 @mcp.tool
-def add_income(
+async def add_income(
     amount: float,
     category: str = "Employment",
     subcategory: str = "Monthly Salary",
@@ -186,7 +186,7 @@ def add_income(
     date: str = ""
 ) -> str:
     """
-    Record money received (salary, freelance, investments, refund, etc.) with description.
+    Record money received asynchronously (salary, freelance, investments, refund, etc.) with description.
     
     Parameters:
     - amount: Money received (e.g. 50000.00)
@@ -195,16 +195,17 @@ def add_income(
     - description: Clear details about the income (e.g. 'Received monthly salary from company')
     - date: Optional date YYYY-MM-DD (defaults to today's date if empty)
     """
+    await ensure_db()
     if not date:
         date = datetime.now().strftime("%Y-%m-%d")
 
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("""
             INSERT INTO transactions (date, type, category, subcategory, amount, description)
             VALUES (?, 'income', ?, ?, ?, ?)
         """, (date, category, subcategory, amount, description))
-        conn.commit()
+        await conn.commit()
         new_id = cursor.lastrowid
 
     sub_info = f" > {subcategory}" if subcategory else ""
@@ -213,25 +214,30 @@ def add_income(
 
 
 # ----------------------------------------------------
-# 7. Tool: Show All Transactions / Expenses
+# 7. Tool: Show All Transactions / Expenses (Asynchronous)
 # ----------------------------------------------------
 @mcp.tool
-def show_all_transactions(filter_type: str = "all") -> str:
+async def show_all_transactions(filter_type: str = "all") -> str:
     """
-    View transactions stored in the database with full category, subcategory, and description.
+    View transactions stored in the database asynchronously with category, subcategory, and description.
     
     Parameters:
     - filter_type: 'all' to see everything, 'expense' for expenses only, or 'income' for income only.
     """
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        
+    await ensure_db()
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
         if filter_type.lower() in ["expense", "income"]:
-            cursor.execute("SELECT * FROM transactions WHERE type = ? ORDER BY date DESC, id DESC", (filter_type.lower(),))
+            async with conn.execute(
+                "SELECT * FROM transactions WHERE type = ? ORDER BY date DESC, id DESC", 
+                (filter_type.lower(),)
+            ) as cursor:
+                rows = await cursor.fetchall()
         else:
-            cursor.execute("SELECT * FROM transactions ORDER BY date DESC, id DESC")
-            
-        rows = cursor.fetchall()
+            async with conn.execute(
+                "SELECT * FROM transactions ORDER BY date DESC, id DESC"
+            ) as cursor:
+                rows = await cursor.fetchall()
 
     if not rows:
         return f"No records found for filter: '{filter_type}'."
@@ -256,10 +262,10 @@ def show_all_transactions(filter_type: str = "all") -> str:
 
 
 # ----------------------------------------------------
-# 8. Tool: Edit Transaction
+# 8. Tool: Edit Transaction (Asynchronous)
 # ----------------------------------------------------
 @mcp.tool
-def edit_transaction(
+async def edit_transaction(
     transaction_id: int,
     amount: float = None,
     category: str = None,
@@ -269,16 +275,16 @@ def edit_transaction(
     transaction_type: str = None
 ) -> str:
     """
-    Edit/update an existing transaction by its ID number.
+    Edit/update an existing transaction asynchronously by its ID number.
     Only the provided fields will be modified.
     """
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT * FROM transactions WHERE id = ?", (transaction_id,))
-        record = cursor.fetchone()
-        if not record:
-            return f"Error: Transaction ID {transaction_id} does not exist."
+    await ensure_db()
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        async with conn.execute("SELECT * FROM transactions WHERE id = ?", (transaction_id,)) as cursor:
+            record = await cursor.fetchone()
+            if not record:
+                return f"Error: Transaction ID {transaction_id} does not exist."
 
         # Keep old value if a parameter was not passed
         updated_amount = amount if amount is not None else record["amount"]
@@ -288,44 +294,44 @@ def edit_transaction(
         updated_date = date if date is not None else record["date"]
         updated_type = transaction_type.lower() if transaction_type is not None else record["type"]
 
-        cursor.execute("""
+        await conn.execute("""
             UPDATE transactions
             SET amount = ?, category = ?, subcategory = ?, description = ?, date = ?, type = ?
             WHERE id = ?
         """, (updated_amount, updated_category, updated_subcategory, updated_desc, updated_date, updated_type, transaction_id))
-        conn.commit()
+        await conn.commit()
 
     return f"Transaction ID {transaction_id} updated successfully!"
 
 
 # ----------------------------------------------------
-# 9. Tool: Delete Transaction
+# 9. Tool: Delete Transaction (Asynchronous)
 # ----------------------------------------------------
 @mcp.tool
-def delete_transaction(transaction_id: int) -> str:
+async def delete_transaction(transaction_id: int) -> str:
     """
-    Delete a transaction by its ID number.
+    Delete a transaction asynchronously by its ID number.
     """
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT * FROM transactions WHERE id = ?", (transaction_id,))
-        if not cursor.fetchone():
-            return f"Error: Transaction ID {transaction_id} not found."
+    await ensure_db()
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        async with conn.execute("SELECT * FROM transactions WHERE id = ?", (transaction_id,)) as cursor:
+            if not await cursor.fetchone():
+                return f"Error: Transaction ID {transaction_id} not found."
 
-        cursor.execute("DELETE FROM transactions WHERE id = ?", (transaction_id,))
-        conn.commit()
+        await conn.execute("DELETE FROM transactions WHERE id = ?", (transaction_id,))
+        await conn.commit()
 
     return f"Transaction ID {transaction_id} deleted successfully."
 
 
 # ----------------------------------------------------
-# 10. Tool: Reset ID Counter / Renumber Transactions
+# 10. Tool: Reset ID Counter / Renumber Transactions (Asynchronous)
 # ----------------------------------------------------
 @mcp.tool
-def reset_id_counter(renumber_existing: bool = True) -> str:
+async def reset_id_counter(renumber_existing: bool = True) -> str:
     """
-    Reset the auto-increment ID counter.
+    Reset the auto-increment ID counter asynchronously.
     
     Parameters:
     - renumber_existing: 
@@ -335,63 +341,65 @@ def reset_id_counter(renumber_existing: bool = True) -> str:
         If False: Leaves existing IDs untouched, but resets the counter so the next
         transaction uses the current highest ID + 1 instead of skipping numbers.
     """
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        
-        # Check current transactions
-        cursor.execute("SELECT id FROM transactions ORDER BY id ASC")
-        rows = cursor.fetchall()
+    await ensure_db()
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        async with conn.execute("SELECT id FROM transactions ORDER BY id ASC") as cursor:
+            rows = await cursor.fetchall()
 
         if not rows:
             # Table is completely empty, reset sqlite auto-increment sequence to 0
-            cursor.execute("DELETE FROM sqlite_sequence WHERE name = 'transactions'")
-            conn.commit()
+            await conn.execute("DELETE FROM sqlite_sequence WHERE name = 'transactions'")
+            await conn.commit()
             return "All test transactions were deleted. ID counter is completely reset to 0! The next transaction will start at ID 1."
 
         if renumber_existing:
             # Re-insert existing rows cleanly so IDs start sequentially from 1
-            cursor.execute("""
+            await conn.execute("""
                 CREATE TEMPORARY TABLE temp_tx AS 
                 SELECT date, type, category, subcategory, amount, description 
                 FROM transactions ORDER BY id ASC
             """)
-            cursor.execute("DELETE FROM transactions")
-            cursor.execute("DELETE FROM sqlite_sequence WHERE name = 'transactions'")
-            cursor.execute("""
+            await conn.execute("DELETE FROM transactions")
+            await conn.execute("DELETE FROM sqlite_sequence WHERE name = 'transactions'")
+            await conn.execute("""
                 INSERT INTO transactions (date, type, category, subcategory, amount, description)
                 SELECT date, type, category, subcategory, amount, description FROM temp_tx
             """)
-            cursor.execute("DROP TABLE temp_tx")
-            conn.commit()
+            await conn.execute("DROP TABLE temp_tx")
+            await conn.commit()
 
-            cursor.execute("SELECT MAX(id) FROM transactions")
-            new_max = cursor.fetchone()[0] or 0
+            async with conn.execute("SELECT MAX(id) FROM transactions") as cursor:
+                row = await cursor.fetchone()
+                new_max = row[0] or 0
             return f"Reset complete! Renumbered all {len(rows)} existing transactions starting from ID 1. Next new transaction will be ID {new_max + 1}."
         else:
             # Just set the sequence counter to the current highest ID
-            cursor.execute("SELECT MAX(id) FROM transactions")
-            max_id = cursor.fetchone()[0] or 0
-            cursor.execute("UPDATE sqlite_sequence SET seq = ? WHERE name = 'transactions'", (max_id,))
-            conn.commit()
+            async with conn.execute("SELECT MAX(id) FROM transactions") as cursor:
+                row = await cursor.fetchone()
+                max_id = row[0] or 0
+            await conn.execute("UPDATE sqlite_sequence SET seq = ? WHERE name = 'transactions'", (max_id,))
+            await conn.commit()
             return f"ID counter adjusted to current highest ID ({max_id}). Next new transaction will be ID {max_id + 1}."
 
 
 # ----------------------------------------------------
-# 10. Tool: Financial Balance Summary
+# 11. Tool: Financial Balance Summary (Asynchronous)
 # ----------------------------------------------------
 @mcp.tool
-def get_balance_summary() -> str:
+async def get_balance_summary() -> str:
     """
-    Calculate and display total income, total expenses, and net remaining balance.
+    Calculate and display total income, total expenses, and net remaining balance asynchronously.
     """
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT SUM(amount) FROM transactions WHERE type = 'income'")
-        total_income = cursor.fetchone()[0] or 0.0
+    await ensure_db()
+    async with aiosqlite.connect(DB_PATH) as conn:
+        async with conn.execute("SELECT SUM(amount) FROM transactions WHERE type = 'income'") as cursor:
+            row = await cursor.fetchone()
+            total_income = row[0] or 0.0
 
-        cursor.execute("SELECT SUM(amount) FROM transactions WHERE type = 'expense'")
-        total_expense = cursor.fetchone()[0] or 0.0
+        async with conn.execute("SELECT SUM(amount) FROM transactions WHERE type = 'expense'") as cursor:
+            row = await cursor.fetchone()
+            total_expense = row[0] or 0.0
 
         balance = total_income - total_expense
 
@@ -404,7 +412,7 @@ def get_balance_summary() -> str:
 
 
 # ----------------------------------------------------
-# 11. Server Runner
+# 12. Server Runner
 # ----------------------------------------------------
 if __name__ == "__main__":
     # Run the FastMCP server

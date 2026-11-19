@@ -1,6 +1,6 @@
 # 💰 Expense & Income Tracker MCP Server
 
-A personal finance MCP (Model Context Protocol) server built using [FastMCP](https://github.com/jlowin/fastmcp). It enables AI assistants (like Claude) to record, organize, analyze, and manage your expenses and income directly through natural conversations, backed by a persistent SQLite database.
+A personal finance MCP (Model Context Protocol) server built using [FastMCP](https://github.com/jlowin/fastmcp). It enables AI assistants (like Claude) to record, organize, analyze, and manage your expenses and income directly through natural conversations, backed by an asynchronous SQLite database (`aiosqlite`) for high-concurrency multi-user access.
 
 ---
 
