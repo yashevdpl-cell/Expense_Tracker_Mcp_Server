@@ -1,5 +1,7 @@
 import sqlite3
 import json
+import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from fastmcp import FastMCP
@@ -13,8 +15,34 @@ mcp = FastMCP(name="Expense Tracker")
 # 2. File & Database Paths
 # ----------------------------------------------------
 BASE_DIR = Path(__file__).parent
-DB_PATH = BASE_DIR / "expenses.db"
 CATEGORIES_PATH = BASE_DIR / "categories.json"
+
+def get_db_path() -> Path:
+    """
+    Determine a writable path for the SQLite database.
+    1. If DATABASE_PATH environment variable is set, use it.
+    2. Try the local project directory (default for local development).
+    3. If the directory is read-only (common in cloud container deployments like /app),
+       fallback to the system temp directory (/tmp/expenses.db).
+    """
+    env_path = os.environ.get("DATABASE_PATH")
+    if env_path:
+        p = Path(env_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        return p
+
+    local_db = BASE_DIR / "expenses.db"
+    try:
+        # Check if directory is writable
+        test_file = BASE_DIR / ".write_test"
+        test_file.touch()
+        test_file.unlink()
+        return local_db
+    except (PermissionError, OSError):
+        # Cloud containers (e.g. FastMCP Cloud) have a read-only /app, but /tmp is always writable
+        return Path(tempfile.gettempdir()) / "expenses.db"
+
+DB_PATH = get_db_path()
 
 def get_connection():
     """Helper function to connect to SQLite database."""
